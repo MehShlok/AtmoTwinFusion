@@ -1,11 +1,11 @@
-% Load pre-trained ResNet-50 model
+% Load pre-trained model
 net = resnet50;
 
 % Define paths to train and test folders
-train_busy_folder = 'C:\Users\lenovo\Desktop\SOP\Hazy_parking_system_dataset\Augmented_images\train\busy';
-train_free_folder = 'C:\Users\lenovo\Desktop\SOP\Hazy_parking_system_dataset\Augmented_images\train\free';
-test_busy_folder = 'C:\Users\lenovo\Desktop\SOP\Hazy_parking_system_dataset\Augmented_images\test\busy';
-test_free_folder = 'C:\Users\lenovo\Desktop\SOP\Hazy_parking_system_dataset\Augmented_images\test\free';
+train_busy_folder = '';
+train_free_folder = '';
+test_busy_folder = '';
+test_free_folder = '';
 
 % Specify the layers for feature extraction
 featureLayer = 'fc1000';% For Resnet-50 specifically
@@ -31,12 +31,51 @@ test_labels = [ones(size(test_features_busy, 1), 1); -ones(size(test_features_fr
 disp('Feature and label combination completed.');
 
 % Train and predict using pinGTSVM
-[acc, ~, ~, Predict_Y, ~, ~, ~, ~, ~, ~] = pinGTSVM(test_features, struct('A', train_features(train_labels==1, :), 'B', train_features(train_labels==-1, :)), struct('c1', 32, 'c2', 32, 'kerfPara', struct('type', 'lin')));%Linear Kernel
-%[acc, ~, ~, Predict_Y, ~, ~, ~, ~, ~, ~] = pinGTSVM_RBF(test_features, struct('A', train_features(train_labels==1, :), 'B', train_features(train_labels==-1, :)), struct('c1', 32, 'c2', 32, 'kerfPara', struct('type', 'gaussian', 'pars', 10)));
+%[acc, ~, ~, Predict_Y, ~, ~, ~, ~, ~, ~] = pinGTSVM(test_features, struct('A', train_features(train_labels==1, :), 'B', train_features(train_labels==-1, :)), struct('c1', 32, 'c2', 32, 'kerfPara', struct('type', 'lin')));%Linear Kernel
+%Working with a Gaussian/RBF Kernel
+DataTrain = struct('A', train_features(train_labels==1, :), ...
+                   'B', train_features(train_labels==-1, :), ...
+                   'test_labels', test_labels);
 
+% Define ranges for parameters and feel free to change the values below
+tau_values = [0.5, 0.8, 1]; 
+c_values = 2.^(-5:2:5);
+mu_values = 2.^(-10:10);
 
+best_accuracy = 0;
+best_params = [];
+
+%Perform grid search
+for tau = tau_values
+    for c1 = c_values
+        for c2 = c_values
+            for mu = mu_values
+                % Set parameters for pinGTSVM_RBF function
+                FunPara = struct('c1', c1, 'c2', c2, 'tau', tau, 'kerfPara', struct('type', 'gaussian', 'pars', mu));
+
+                % Train and predict using pinGTSVM_RBF
+                [acc, ~, ~, Predict_Y, ~, ~, ~, ~, ~, ~] = pinGTSVM_RBF(test_features, DataTrain, FunPara);
+
+                % Calculate accuracy
+                accuracy = acc; 
+
+                % Update best accuracy and parameters if current accuracy is better
+                if accuracy > best_accuracy
+                    best_accuracy = accuracy;
+                    best_params = [tau, c1, c2, mu];
+                end
+            end
+        end
+    end
+end
+
+%Display best parameters and accuracy
+disp(['Best parameters: tau = ', num2str(best_params(1)), ', c1 = ', num2str(best_params(2)), ', c2 = ', num2str(best_params(3)), ', mu = ', num2str(best_params(4))]);
+disp(['Best accuracy: ', num2str(best_accuracy)]);
+
+%[acc, ~, ~, Predict_Y, ~, ~, ~, ~, ~, ~] = pinGTSVM_RBF(test_features, DataTrain, struct('c1', 64, 'c2', 64, 'kerfPara', struct('type', 'gaussian', 'pars', 64)));
 % Display accuracy
-disp(['Accuracy: ', num2str(acc)]);
+%disp(['Accuracy: ', num2str(acc)]);
 
 % Define a function to extract features from images
 function [features, labels] = extract_features(folder, net, featureLayer)
