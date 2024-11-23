@@ -1,2 +1,2 @@
 # Project-on-TWSVMs-CNNs
-This is my official record of the SOP done under Prof. JK Sahoo in 2-2 on TWSVMs integration with CNNs and their application
+This repository consists of a step by step guide to implement the PinGTSVM hybrid model for atmospheric noise mitigation
